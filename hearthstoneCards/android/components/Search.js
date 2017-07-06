@@ -1,14 +1,25 @@
 import React, {Component} from 'react'
 import axios from 'axios'
+import {connect,Provider} from 'react-redux'
+import Spinner from 'react-native-loading-spinner-overlay'
+import TimerMixin from 'react-timer-mixin';
+import timer from 'react-native-timer'
+import CardDetail from './CardDetail.js'
+
+import {getSingleCard} from '../actions/index.js'
+import {getCards} from '../actions/index.js'
+import store from '../store/store.js'
 
 import {
-  AppRegistry,
   StyleSheet,
   Text,
   View,
   ScrollView,
   Picker,
-  Image
+  Image,
+  TouchableOpacity,
+  Modal,
+  TouchableHighlight
 } from 'react-native'
 
 class Search extends Component {
@@ -16,11 +27,12 @@ class Search extends Component {
     super(props)
     this.state={
       expansion: "Select Expansion",
-      cards: [],
-      isLoading: false
+      modalVisible: false,
+      visible:true
     }
   }
   render(){
+    const { dispatch, navigationState } = this.props
     return(
       <View>
         <Picker
@@ -31,7 +43,7 @@ class Search extends Component {
           <Picker.Item label="Blackrock Mountain" value="Blackrock Mountain" />
           <Picker.Item label="Classic" value="Classic" />
           <Picker.Item label="Journey to Un'Goro" value="Journey to Un'Goro" />
-          <Picker.Item label="Goblin vs Gnomes" value="Goblin vs Gnomes" />
+          <Picker.Item label="Goblins vs Gnomes" value="Goblins vs Gnomes" />
           <Picker.Item label="Mean Streets of Gadgetzan" value="Mean Streets of Gadgetzan" />
           <Picker.Item label="Naxxramas" value="Naxxramas" />
           <Picker.Item label="One Night in Karazhan" value="One Night in Karazhan" />
@@ -41,52 +53,73 @@ class Search extends Component {
         </Picker>
         <ScrollView>
           <View style={styles.flexboxContainer}>
-          {(this.state.isLoading === true)
-          ?<Image source={{ uri: 'http://regex.info/i/jpgqual/loading.png' }} style={{width:200,height:200}} />
-          :this.state.cards.map((card,index)=> {
-            return (card.imgGold !== null) ? <Image key={card.cardId} source={{ uri: card.imgGold }} style={styles.cards} /> : <Text>{card.name}</Text>
-          })}
+          {(this.state.expansion !== "Select Expansion" && this.props.cards.length === 0)
+          ?<Spinner visible={this.state.visible} textContent={"Loading..."} textStyle={{color: 'black'}} />
+          :this.props.cards.map((card,index)=> {
+            return (card.imgGold !== null)
+          ?<TouchableOpacity key={card.cardId} onPress={() =>
+            this.clickedCard(card.cardId)
+          }><Image key={card.cardId}
+              source={{ uri: card.imgGold }}
+              style={styles.cards}
+               />
+             </TouchableOpacity>
+            : <Text>{card.name}</Text>
+            })}
         </View>
         </ScrollView>
+        <Modal
+          animationType={"slide"}
+          transparent={false}
+          visible={this.state.modalVisible}
+          onRequestClose={() => {alert("Modal has been closed.")}}
+          >
+         <View style={{marginTop: 22}}>
+          <View style={{flex:1}}>
+            <Spinner visible={this.state.visible} textContent={"Loading..."} textStyle={{color: 'black'}} />
+          </View>
+         </View>
+        </Modal>
       </View>
-
     )
   }
 
-  cards(cards){
-    this.setState({
-      cards: cards,
-      isLoading:false
-    })
-  }
-
-  loading(status,expansion){
-    console.log(`masuk loading`);
-    this.setState({
-      isLoading: status,
-      expansion: expansion
-    })
-    console.log(this.state.isLoading);
-  }
+  clickedCard(id){
+    this.props.getSingleCard(id)
+      this.setState({modalVisible: true});
+      setTimeout(()=>{
+        this.setState({
+          modalVisible:false
+        })
+        this.props.navigation.navigate("CardDetail", {card: this.props.card})
+      },3000)
+    }
 
   selectedExpansion(expansion){
-    this.loading(true,expansion)
-    console.log(this.state.cards.length);
-    axios.get('https://omgvamp-hearthstone-v1.p.mashape.com/cards',{
-      headers:{'X-Mashape-Key': 'sSWJykoWUAmshrcHV4HoH14n0KBfp1bcI0njsn8giOXI1ONRQ8'}})
-      .then(response=>{
-        console.log(`masuk response data`);
-          this.cards(response.data[expansion])
-        })
-      .catch(err=>{
-        console.log(`err`);
-        console.log(err);
-      })
-      console.log(this.state.cards);
+    this.setState({
+      expansion: expansion
+    })
+    if(expansion !== "Selected Expansion"){
+          this.props.getCards(expansion)
+      }
     }
 
     componentWillMount(){
-      console.log(`masuk will mount`);
+      console.log(this.props.navigation);
+    }
+  }
+
+  const mapStateToProps = (state)=>{
+    return{
+      cards: state.cards,
+      card: state.card
+    }
+  }
+
+  const mapDispatchToProps = (dispatch)=>{
+    return{
+      getCards: (expansion) => dispatch(getCards(expansion)),
+      getSingleCard: (id) => dispatch(getSingleCard(id))
     }
   }
 
@@ -100,11 +133,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap'
   },
   cards:{
-    width:120,
+    width:113,
     height: 200,
-    margin: 5
+    margin: 2
   }
 
 })
 
-export default Search
+export default connect(mapStateToProps,mapDispatchToProps)(Search)
